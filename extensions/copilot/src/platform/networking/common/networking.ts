@@ -497,6 +497,28 @@ export interface INetworkRequestOptions {
  */
 export type InteractionTypeOverride = 'conversation-subagent' | 'conversation-compaction' | 'conversation-background';
 
+/**
+ * Resolves the literal `${sessionId}` token in request header values.
+ *
+ * BYOK Custom Endpoints let users reference the per-request/session id from a header (e.g. a gateway
+ * that routes or bills per session) via the literal token `${sessionId}`. Unlike `${apiKey}`, that
+ * value is not known when the endpoint is constructed, so the endpoint leaves the literal untouched
+ * and the pipeline substitutes it here, right before the request is sent. Pass the request id
+ * (`ourRequestId`). When `sessionId` is undefined the token is left intact so the unresolved
+ * placeholder stays visible.
+ */
+export function interpolateSessionIdInHeaders(headers: ReqHeaders, sessionId: string | undefined): void {
+	if (!sessionId) {
+		return;
+	}
+	for (const key of Object.keys(headers)) {
+		const value = headers[key];
+		if (value.includes('${sessionId}')) {
+			headers[key] = value.split('${sessionId}').join(sessionId);
+		}
+	}
+}
+
 function networkRequest(
 	accessor: ServicesAccessor,
 	options: INetworkRequestOptions,
@@ -530,6 +552,9 @@ function networkRequest(
 	};
 	headers['X-Interaction-Type'] = agentInteractionType;
 	headers['X-Agent-Task-Id'] = requestId;
+	// Custom Endpoints leave `${sessionId}` in their configured header values (it isn't known at
+	// endpoint construction time), so resolve it against the request id before the request goes out.
+	interpolateSessionIdInHeaders(headers, requestId);
 
 	if (endpoint.interceptBody) {
 		endpoint.interceptBody(body);

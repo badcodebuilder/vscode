@@ -11,7 +11,7 @@ import { IInstantiationService } from '../../../../util/vs/platform/instantiatio
 import { createFakeResponse } from '../../../test/node/fetcher';
 import { createPlatformServices } from '../../../test/node/services';
 import { FetchOptions, IAbortController, IFetcherService, PaginationOptions, Response, WebSocketConnection } from '../../common/fetcherService';
-import { IEndpoint, isCAPIEndpoint, isCAPIRequestMetadata, postRequest } from '../../common/networking';
+import { IEndpoint, interpolateSessionIdInHeaders, isCAPIEndpoint, isCAPIRequestMetadata, postRequest, ReqHeaders } from '../../common/networking';
 
 suite('Networking test Suite', function () {
 
@@ -100,6 +100,44 @@ suite('Networking test Suite', function () {
 		});
 
 		assert.strictEqual('Authorization' in headerBuffer!, false);
+	});
+
+	test('resolves the ${sessionId} token in endpoint headers from the request id', async function () {
+		const testingServiceCollection = createPlatformServices();
+		testingServiceCollection.define(IFetcherService, new StaticFetcherService());
+		const accessor = testingServiceCollection.createTestingAccessor();
+		await accessor.get(IInstantiationService).invokeFunction(postRequest, {
+			endpointOrUrl: {
+				urlOrRequestMetadata: 'https://api.example.com/v1/chat/completions',
+				getExtraHeaders: () => ({ 'X-Session-Id': 'conv ${sessionId}' }),
+			} as unknown as IEndpoint,
+			secretKey: '',
+			intent: 'test',
+			requestId: 'request-7',
+		});
+
+		assert.strictEqual(headerBuffer!['X-Session-Id'], 'conv request-7');
+	});
+});
+
+suite('interpolateSessionIdInHeaders', function () {
+
+	test('replaces the ${sessionId} token across header values and leaves others alone', function () {
+		const headers: ReqHeaders = { 'X-Session-Id': 'conv ${sessionId}', 'X-Other': 'static' };
+		interpolateSessionIdInHeaders(headers, 'session-abc');
+		assert.deepStrictEqual(headers, { 'X-Session-Id': 'conv session-abc', 'X-Other': 'static' });
+	});
+
+	test('replaces every occurrence of the token', function () {
+		const headers: ReqHeaders = { 'X-Session-Id': '${sessionId}:${sessionId}' };
+		interpolateSessionIdInHeaders(headers, 'abc');
+		assert.deepStrictEqual(headers, { 'X-Session-Id': 'abc:abc' });
+	});
+
+	test('leaves the token untouched when no session id is available', function () {
+		const headers: ReqHeaders = { 'X-Session-Id': 'conv ${sessionId}' };
+		interpolateSessionIdInHeaders(headers, undefined);
+		assert.deepStrictEqual(headers, { 'X-Session-Id': 'conv ${sessionId}' });
 	});
 });
 

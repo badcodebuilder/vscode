@@ -722,6 +722,32 @@ describe('CustomEndpointBYOKModelProvider', () => {
 			expect(headers['X-Custom-Auth']).toBe('ApiKey secret-123');
 		});
 
+		it('leaves the ${sessionId} token untouched for the request pipeline to resolve', () => {
+			const metadata = makeMetadata(undefined);
+			metadata.requestHeaders = { 'X-Session-Id': 'conv ${sessionId}' };
+			const endpoint = instaService.createInstance(CustomEndpointOAIEndpoint,
+				metadata,
+				'test-api-key',
+				'https://api.example.com/v1/chat/completions');
+			const headers = endpoint.getExtraHeaders();
+
+			// Unlike ${apiKey}, the session id is not known when the endpoint is constructed, so the
+			// endpoint must not substitute it; the request pipeline resolves it at send time.
+			expect(headers['X-Session-Id']).toBe('conv ${sessionId}');
+		});
+
+		it('interpolates ${apiKey} but leaves ${sessionId} in the same header value', () => {
+			const metadata = makeMetadata(undefined);
+			metadata.requestHeaders = { 'X-Combined': '${apiKey}:${sessionId}' };
+			const endpoint = instaService.createInstance(CustomEndpointOAIEndpoint,
+				metadata,
+				'secret-123',
+				'https://api.example.com/v1/chat/completions');
+			const headers = endpoint.getExtraHeaders();
+
+			expect(headers['X-Combined']).toBe('secret-123:${sessionId}');
+		});
+
 		it('suppresses default Bearer when user supplies a well-known non-reserved auth header (x-goog-api-key)', () => {
 			const metadata = makeMetadata(undefined);
 			metadata.requestHeaders = { 'x-goog-api-key': '${apiKey}' };

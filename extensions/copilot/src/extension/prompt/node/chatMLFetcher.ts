@@ -23,7 +23,7 @@ import { getImageTelemetryMeasurementsFromMessages, type ImageTelemetryMeasureme
 import { collectSingleLineErrorMessage, ILogService } from '../../../platform/log/common/logService';
 import { FinishedCallback, getCopilotServiceRequestId, getGitHubCopilotRequestTe, getRequestId, gitHubCopilotRequestTeProperty, IResponseDelta, OptionalChatRequestParams, RequestId } from '../../../platform/networking/common/fetch';
 import { FetcherId, IFetcherService, Response } from '../../../platform/networking/common/fetcherService';
-import { IChatEndpoint, IEndpointBody, InteractionTypeOverride, postRequest, stringifyUrlOrRequestMetadata } from '../../../platform/networking/common/networking';
+import { IChatEndpoint, IEndpointBody, InteractionTypeOverride, interpolateSessionIdInHeaders, postRequest, stringifyUrlOrRequestMetadata } from '../../../platform/networking/common/networking';
 import { CAPIChatMessage, ChatCompletion, FilterReason, FinishedCompletionReason } from '../../../platform/networking/common/openai';
 import { sendEngineMessagesTelemetry } from '../../../platform/networking/node/chatStream';
 import { CAPIWebSocketErrorEvent, IChatWebSocketManager, isCAPIWebSocketError } from '../../../platform/networking/node/chatWebSocketManager';
@@ -1201,6 +1201,9 @@ export class ChatMLFetcherImpl extends AbstractChatMLFetcher {
 		};
 		additionalHeaders['X-Interaction-Type'] = agentInteractionType;
 		additionalHeaders['X-Agent-Task-Id'] = ourRequestId;
+		// Custom Endpoints leave `${sessionId}` in configured header values; resolve it against the
+		// request id, which is only known here at send time.
+		interpolateSessionIdInHeaders(additionalHeaders, ourRequestId);
 		if (request.messages?.some((m: CAPIChatMessage) => Array.isArray(m.content) ? m.content.some(c => 'image_url' in c) : false) && chatEndpointInfo.supportsVision) {
 			additionalHeaders['Copilot-Vision-Request'] = 'true';
 		}

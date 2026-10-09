@@ -203,9 +203,12 @@ export class CustomEndpointBYOKModelProvider extends AbstractOpenAICompatibleLMP
  *    `authorization` are permitted through the sanitizer (only for this
  *    subclass), and the literal token `${apiKey}` in a header value is
  *    replaced with the configured API key so the secret stays in
- *    `${input:...}` secret storage. When the user supplies any well-known auth
- *    header, the default inferred auth header is suppressed to avoid sending
- *    conflicting credentials.
+ *    `${input:...}` secret storage. The literal token `${sessionId}` is left
+ *    untouched here; the request pipeline resolves it to the conversation id
+ *    right before the request is sent (the id is not known when the endpoint is
+ *    constructed). When the user supplies any well-known auth header, the
+ *    default inferred auth header is suppressed to avoid sending conflicting
+ *    credentials.
  * 4. Omits the Responses API `store` property when Zero Data Retention was not
  *    explicitly configured, allowing custom implementations to use their own default.
  * 5. Chains Responses requests via `previous_response_id` per the Open Responses spec,
